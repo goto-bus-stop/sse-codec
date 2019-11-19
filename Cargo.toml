@@ -1,0 +1,18 @@
+[package]
+name = "sse-codec"
+version = "0.1.0"
+authors = ["Renée Kooi <renee@kooi.me>"]
+edition = "2018"
+
+[dependencies]
+# TODO: Update codec to 0.3.1, use futures-io, and update all the dev deps once
+# a release of surf exists that uses futures 0.3
+futures_codec = "= 0.3.0"
+futures-io-preview = "= 0.3.0-alpha.19"
+bytes = "0.4"
+memchr = "2.2"
+
+[dev-dependencies]
+surf = { version = "1.0.3", default-features = false, features = ["native-client"] }
+async-std = "= 0.99.11"
+futures-preview = "= 0.3.0-alpha.19"
