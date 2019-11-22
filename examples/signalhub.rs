@@ -48,7 +48,7 @@ async fn amain() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn main() {
     async_std::task::block_on(async {
         amain().await.unwrap();
     });
