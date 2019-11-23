@@ -8,7 +8,7 @@
 //! use sse_codec::{decode_stream, Event};
 //! use futures::stream::TryStreamExt; // for try_next()
 //!
-//! let response = surf::get("https://signalhub-jccqtwhdwc.now.sh/v1/sse-codec/example").await?;
+//! let response = surf::get("https://some-site.com/events").await?;
 //! let mut events = decode_stream(response);
 //!
 //! while let Some(event) = events.try_next().await? {
@@ -18,13 +18,10 @@
 //!         Event::LastEventId { id } => {
 //!             // change the last event ID
 //!         },
-//!         Event::Message(message) if message.id.is_some() => {
-//!             // Also have to change the last event ID here
-//!         }
 //!         Event::Retry { retry } => {
 //!             // change a retry timer value or something
 //!         }
-//!         Event::Message(message) if message.data == "stop" => {
+//!         Event::Message { event, .. } if event == "stop" => {
 //!             break;
 //!         }
 //!         _ => (),
@@ -39,33 +36,17 @@ use memchr::memchr2;
 use std::fmt::Write as _;
 use std::{fmt, str::FromStr};
 
-/// An event message.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MessageEvent {
-    /// The message's ID, to be set as the event source's last event ID if present.
-    pub id: Option<String>,
-    /// The event type. Defaults to "message" if no event name is provided.
-    pub event: String,
-    /// The data for this event.
-    pub data: String,
-}
-
-impl Default for MessageEvent {
-    fn default() -> Self {
-        Self {
-            id: None,
-            event: "message".to_string(),
-            data: String::new(),
-        }
-    }
-}
-
 /// An "event", either an incoming message or some meta-action that needs to be applied to the
 /// stream.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     /// An incoming message.
-    Message(MessageEvent),
+    Message {
+        /// The event type. Defaults to "message" if no event name is provided.
+        event: String,
+        /// The data for this event.
+        data: String,
+    },
     /// Set the _last event ID string_.
     ///
     /// See also the [Server-Sent Events spec](https://html.spec.whatwg.org/multipage/server-sent-events.html#concept-event-stream-last-event-id).
@@ -84,12 +65,11 @@ pub enum Event {
 
 impl Event {
     /// Create a server-sent event message.
-    pub fn message(id: Option<&str>, event: &str, data: &str) -> Self {
-        Event::Message(MessageEvent {
-            id: id.map(ToString::to_string),
+    pub fn message(event: &str, data: &str) -> Self {
+        Event::Message {
             event: event.to_string(),
             data: data.to_string(),
-        })
+        }
     }
 
     /// Create a message that sets the last event ID, without emitting an event message.
@@ -163,7 +143,7 @@ impl FromStr for Event {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut codec = SSECodec::default();
         for line in s.lines() {
-            if let Some(message @ Event::Message(_)) = codec.parse_line(line) {
+            if let Some(message @ Event::Message { .. }) = codec.parse_line(line) {
                 return Ok(message);
             }
         }
@@ -171,32 +151,27 @@ impl FromStr for Event {
     }
 }
 
-impl fmt::Display for MessageEvent {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.event != "message" {
-            write!(f, "event: {}\n", &self.event)?;
-        }
-
-        for line in self.data.lines() {
-            write!(f, "data: {}\n", line)?;
-        }
-
-        if let Some("") = self.id.as_ref().map(String::as_str) {
-            write!(f, "id\n")
-        } else if let Some(id) = self.id.as_ref() {
-            write!(f, "id: {}\n", id)
-        } else {
-            Ok(())
-        }
-    }
-}
-
 impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Event::Message(m) => m.fmt(f),
+            Event::Message { event, data } => {
+                if event != "message" {
+                    write!(f, "event: {}\n", &event)?;
+                }
+
+                for line in data.lines() {
+                    write!(f, "data: {}\n", line)?;
+                }
+                Ok(())
+            },
             Event::Retry { retry } => write!(f, "retry: {}\n", retry),
-            Event::LastEventId { id } => write!(f, "id: {}\n", id),
+            Event::LastEventId { id } => {
+                if id.is_empty() {
+                    write!(f, "id\n")
+                } else {
+                    write!(f, "id: {}\n", id)
+                }
+            }
         }
     }
 }
@@ -218,24 +193,23 @@ impl SSECodec {
             "message".to_string()
         }
 
-        // If the data buffer is an empty string, set the data buffer and the event type buffer to the empty string [and return.]
-        //
-        // This is reordered a bit because sse-codec does not hold the stream state. We return a
-        // LastEventId instance if the data buffer is empty but the last event ID buffer is not.
-        if self.data.is_empty() {
+        if let Some(id) = self.id.take() {
+            // Set the last event ID string of the event source to the value of the last event ID buffer.
+            //
+            // NOTE: In the spec, the last event ID state is maintained and this update happens for
+            // every message. However sse-codec does not maintain last event ID state, so instead
+            // it emits a LastEventId event whenever it is updated, always separately from the
+            // messages themselves.
+            Some(Event::LastEventId { id })
+        } else if self.data.is_empty() {
+            // If the data buffer is an empty string, set the data buffer and the event type buffer to the empty string [and return.]
             self.event.take();
-            if let Some(id) = self.id.take() {
-                // Set the last event ID string of the event source to the value of the last event ID buffer.
-                Some(Event::LastEventId { id })
-            } else {
-                None
-            }
+            None
         } else {
-            Some(Event::Message(MessageEvent {
-                id: std::mem::replace(&mut self.id, None),
-                event: std::mem::replace(&mut self.event, None).unwrap_or_else(default_event_name),
+            Some(Event::Message {
+                event: self.event.take().unwrap_or_else(default_event_name),
                 data: std::mem::replace(&mut self.data, String::new()),
-            }))
+            })
         }
     }
 
@@ -250,7 +224,7 @@ impl SSECodec {
                 if let Ok(time) = value.parse::<u64>() {
                     return Some(Event::Retry { retry: time });
                 }
-            },
+            }
             // If the field name is "event":
             (Some("event"), Some(value)) => {
                 // Set the event type buffer to field value.
@@ -324,11 +298,18 @@ mod tests {
 
     #[test]
     fn parse() {
-        let event: Event = "event: add\ndata: test\ndata: test2\n\n".parse().unwrap();
+        let mut codec = SSECodec::default();
+        let mut event = None;
+        let s = "event: add\ndata: test\ndata: test2\n\n";
+        for line in s.lines() {
+            if let Some(message @ Event::Message { .. }) = codec.parse_line(line) {
+                event = Some(message);
+                break;
+            }
+        }
         assert_eq!(
             event,
-            Event::Message(MessageEvent {
-                id: None,
+            Some(Event::Message {
                 event: "add".to_string(),
                 data: "test\ntest2".to_string(),
             })

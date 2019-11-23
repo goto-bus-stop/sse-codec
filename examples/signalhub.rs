@@ -14,8 +14,8 @@ async fn listen() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     while let Some(line) = events.try_next().await? {
         println!("incoming: {:?}", line);
 
-        if let Event::Message(message) = line {
-            if message.data == "stop" {
+        if let Event::Message { data, .. } = line {
+            if data == "stop" {
                 break;
             }
         }
