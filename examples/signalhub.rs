@@ -1,6 +1,6 @@
 //! Talk to a [Signalhub](https://github.com/mafintosh/signalhub) signaling server.
 // seems kinda bad that this is needed?
-#![type_length_limit="1059008"]
+#![type_length_limit = "1059008"]
 
 use futures::{future, TryStreamExt};
 use sse_codec::{decode_stream, Event};

@@ -163,7 +163,7 @@ impl fmt::Display for Event {
                     write!(f, "data: {}\n", line)?;
                 }
                 Ok(())
-            },
+            }
             Event::Retry { retry } => write!(f, "retry: {}\n", retry),
             Event::LastEventId { id } => {
                 if id.is_empty() {
@@ -289,7 +289,7 @@ impl Decoder for SSECodec {
                 line
             };
             if let Some(event) = self.parse_line(line) {
-                return Ok(Some(event))
+                return Ok(Some(event));
             }
         }
         Ok(None)
@@ -362,7 +362,9 @@ mod wpt {
     }
 
     fn decode(input: &[u8]) -> DecodeIter<'_> {
-        DecodeIter { inner: decode_stream(input) }
+        DecodeIter {
+            inner: decode_stream(input),
+        }
     }
 
     /// https://github.com/web-platform-tests/wpt/blob/master/eventsource/event-data.html
@@ -384,9 +386,27 @@ mod wpt {
             "\n",
         );
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "msg\nmsg".into() }));
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "".into() }));
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "end".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "msg\nmsg".into()
+            })
+        );
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "".into()
+            })
+        );
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "end".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -404,8 +424,20 @@ mod wpt {
         input.extend(b"data:3\n");
         input.extend(b"\n");
         let mut messages = decode(&input);
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "1".into() }));
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "3".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "1".into()
+            })
+        );
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "3".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -424,8 +456,20 @@ mod wpt {
         input.extend(b"data:3\n");
         input.extend(b"\n");
         let mut messages = decode(&input);
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "2".into() }));
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "3".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "2".into()
+            })
+        );
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "3".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -433,13 +477,7 @@ mod wpt {
     #[test]
     fn comments() {
         let longstring = "x".repeat(2049);
-        let mut input = concat!(
-            "data:1\r",
-            ":\0\n",
-            ":\r\n",
-            "data:2\n",
-            ":"
-        ).to_string();
+        let mut input = concat!("data:1\r", ":\0\n", ":\r\n", "data:2\n", ":").to_string();
         input.push_str(&longstring);
         input.push_str("\r");
         input.push_str("data:3\n");
@@ -449,7 +487,13 @@ mod wpt {
         input.push_str("\n");
         input.push_str("data:4\n\n");
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "1\n2\n3\n4".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "1\n2\n3\n4".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -458,8 +502,17 @@ mod wpt {
     fn data_before_final_empty_line() {
         let input = "retry:1000\ndata:test1\n\nid:test\ndata:test2";
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Retry { retry: 1000 }));
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "test1".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Retry { retry: 1000 })
+        );
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "test1".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -468,9 +521,27 @@ mod wpt {
     fn field_data() {
         let input = "data:\n\ndata\ndata\n\ndata:test\n\n";
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "".into() }));
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "\n".into() }));
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "test".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "".into()
+            })
+        );
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "\n".into()
+            })
+        );
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "test".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -479,7 +550,13 @@ mod wpt {
     fn field_event_empty() {
         let input = "event: \ndata:data\n\n";
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "".into(), data: "data".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "".into(),
+                data: "data".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -488,8 +565,20 @@ mod wpt {
     fn field_event() {
         let input = "event:test\ndata:x\n\ndata:x\n\n";
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "test".into(), data: "x".into() }));
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "x".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "test".into(),
+                data: "x".into()
+            })
+        );
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "x".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -512,7 +601,13 @@ mod wpt {
     fn field_parsing() {
         let input = "data:\0\ndata:  2\rData:1\ndata\0:2\ndata:1\r\0data:4\nda-ta:3\rdata_5\ndata:3\rdata:\r\n data:32\ndata:4\n\n";
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "\0\n 2\n1\n3\n\n4".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "\0\n 2\n1\n3\n\n4".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -521,8 +616,17 @@ mod wpt {
     fn field_retry_bogus() {
         let input = "retry:3000\nretry:1000x\ndata:x\n\n";
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Retry { retry: 3000 }));
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "x".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Retry { retry: 3000 })
+        );
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "x".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -531,7 +635,13 @@ mod wpt {
     fn field_retry_empty() {
         let input = "retry\ndata:test\n\n";
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "test".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "test".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -540,17 +650,33 @@ mod wpt {
     fn field_retry() {
         let input = "retry:03000\ndata:x\n\n";
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Retry { retry: 3000 }));
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "x".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Retry { retry: 3000 })
+        );
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "x".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
     /// https://github.com/web-platform-tests/wpt/blob/master/eventsource/format-field-unknown.htm
     #[test]
     fn field_unknown() {
-        let input = "data:test\n data\ndata\nfoobar:xxx\njustsometext\n:thisisacommentyay\ndata:test\n\n";
+        let input =
+            "data:test\n data\ndata\nfoobar:xxx\njustsometext\n:thisisacommentyay\ndata:test\n\n";
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "test\n\ntest".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "test\n\ntest".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -559,7 +685,13 @@ mod wpt {
     fn leading_space() {
         let input = "data:\ttest\rdata: \ndata:test\n\n";
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "\ttest\n\ntest".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "\ttest\n\ntest".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -568,7 +700,13 @@ mod wpt {
     fn newlines() {
         let input = "data:test\r\ndata\ndata:test\r\n\r";
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "test\n\ntest".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "test\n\ntest".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -577,7 +715,13 @@ mod wpt {
     fn null_character() {
         let input = "data:\0\n\n\n\n";
         let mut messages = decode(input.as_bytes());
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "\0".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "\0".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 
@@ -586,7 +730,13 @@ mod wpt {
     fn utf_8() {
         let input = b"data:ok\xE2\x80\xA6\n\n";
         let mut messages = decode(input);
-        assert_eq!(messages.next().map(Result::unwrap), Some(Event::Message { event: "message".into(), data: "ok…".into() }));
+        assert_eq!(
+            messages.next().map(Result::unwrap),
+            Some(Event::Message {
+                event: "message".into(),
+                data: "ok…".into()
+            })
+        );
         assert!(messages.next().is_none());
     }
 }
