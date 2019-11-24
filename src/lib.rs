@@ -156,20 +156,20 @@ impl fmt::Display for Event {
         match self {
             Event::Message { event, data } => {
                 if event != "message" {
-                    write!(f, "event: {}\n", &event)?;
+                    writeln!(f, "event: {}", &event)?;
                 }
 
                 for line in data.lines() {
-                    write!(f, "data: {}\n", line)?;
+                    writeln!(f, "data: {}", line)?;
                 }
                 Ok(())
             }
-            Event::Retry { retry } => write!(f, "retry: {}\n", retry),
+            Event::Retry { retry } => writeln!(f, "retry: {}", retry),
             Event::LastEventId { id } => {
                 if id.is_empty() {
-                    write!(f, "id\n")
+                    writeln!(f, "id")
                 } else {
-                    write!(f, "id: {}\n", id)
+                    writeln!(f, "id: {}", id)
                 }
             }
         }
@@ -221,7 +221,7 @@ impl SSECodec {
     }
 
     fn parse_line(&mut self, line: &str) -> Option<Event> {
-        let mut parts = line.splitn(2, ":");
+        let mut parts = line.splitn(2, ':');
         match (parts.next(), parts.next()) {
             // If the field name is "retry":
             (Some("retry"), Some(value)) if value.chars().all(|c| c.is_ascii_digit()) => {
@@ -301,7 +301,7 @@ impl Encoder for SSECodec {
     type Error = Error;
 
     fn encode(&mut self, item: Self::Item, dest: &mut BytesMut) -> Result<(), Self::Error> {
-        write!(dest, "{}\n", item).map_err(Into::into)
+        writeln!(dest, "{}", item).map_err(Into::into)
     }
 }
 
