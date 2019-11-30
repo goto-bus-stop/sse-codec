@@ -305,13 +305,19 @@ impl Encoder for SSECodec {
     }
 }
 
+/// Type of a decoding stream, returned from `decode_stream()`.
+pub type DecodeStream<R> = FramedRead<R, SSECodec>;
+
+/// Type of an encoding stream, returned from `encode_stream()`.
+pub type EncodeStream<W> = FramedWrite<W, SSECodec>;
+
 /// Parse messages from an `AsyncRead`, returning a stream of `Event`s.
-pub fn decode_stream<R: AsyncRead>(input: R) -> FramedRead<R, SSECodec> {
+pub fn decode_stream<R: AsyncRead>(input: R) -> DecodeStream<R> {
     FramedRead::new(input, SSECodec::default())
 }
 
 /// Encode `Event`s into an `AsyncWrite`.
-pub fn encode_stream<W: AsyncWrite>(output: W) -> FramedWrite<W, SSECodec> {
+pub fn encode_stream<W: AsyncWrite>(output: W) -> EncodeStream<W> {
     FramedWrite::new(output, SSECodec::default())
 }
 
