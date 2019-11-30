@@ -2,7 +2,12 @@
 name = "sse-codec"
 version = "0.1.0"
 authors = ["Renée Kooi <renee@kooi.me>"]
+description = "async Server-Sent Events protocol encoder/decoder"
 edition = "2018"
+license = "MPL-2.0"
+homepage = "https://github.com/goto-bus-stop/sse-codec"
+repository = "https://github.com/goto-bus-stop/sse-codec"
+readme = "README.md"
 
 [dependencies]
 futures_codec = "0.3.1"
@@ -11,6 +16,6 @@ bytes = "0.4"
 memchr = "2.2"
 
 [dev-dependencies]
-surf = { git = "https://github.com/http-rs/surf", branch = "futures-0.3", default-features = false, features = ["native-client"] }
+surf = { git = "https://github.com/http-rs/surf", default-features = false, features = ["native-client"] }
 async-std = "1.0"
 futures = "0.3"
