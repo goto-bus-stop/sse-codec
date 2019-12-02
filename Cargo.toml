@@ -10,9 +10,9 @@ repository = "https://github.com/goto-bus-stop/sse-codec"
 readme = "README.md"
 
 [dependencies]
-futures_codec = { git = "https://github.com/goto-bus-stop/futures-codec", branch = "ignore-test" }
+futures_codec = "= 0.3.4"
 futures-io = "0.3"
-bytes = "0.4"
+bytes = "0.5"
 memchr = "2.2"
 
 [dev-dependencies]
