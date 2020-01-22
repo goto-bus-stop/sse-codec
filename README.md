@@ -8,7 +8,7 @@ On [docs.rs](https://docs.rs/sse-codec).
 In Cargo.toml:
 ```toml
 [dependencies]
-sse-codec = "^0.1.0"
+sse-codec = "^0.2.0"
 ```
 
 ## License

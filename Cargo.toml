@@ -1,6 +1,6 @@
 [package]
 name = "sse-codec"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Renée Kooi <renee@kooi.me>"]
 description = "async Server-Sent Events protocol encoder/decoder"
 edition = "2018"
