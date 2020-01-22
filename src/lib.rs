@@ -345,6 +345,27 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn decode_stream_when_fed_by_line() {
+        use futures::stream::{self, StreamExt, TryStreamExt};
+
+        let input: Vec<&str> = vec![":ok", "", "event:message", "id:id1", "data:data1", ""];
+
+        let body_stream = stream::iter(input).map(|i| Ok(i.to_owned() + "\n"));
+
+        let messages = decode_stream(body_stream.into_async_read());
+
+        let mut result = None;
+        async_std::task::block_on(async {
+            result = Some(messages.map(|i| i.unwrap()).collect::<Vec<_>>().await);
+        });
+
+        let results = result.unwrap();
+        assert_eq!(results.len(), 2);
+        assert_eq!(results.get(0).unwrap(), &Event::id("id1"));
+        assert_eq!(results.get(1).unwrap(), &Event::message("message", "data1"));
+    }
 }
 
 #[cfg(test)]
@@ -745,26 +766,5 @@ mod wpt {
             })
         );
         assert!(messages.next().is_none());
-    }
-
-    #[test]
-    fn decode_stream_when_fed_by_line() {
-        use futures::stream::{self, StreamExt, TryStreamExt};
-
-        let input: Vec<&str> = vec![":ok", "", "event:message", "id:id1", "data:data1", ""];
-
-        let body_stream = stream::iter(input).map(|i| Ok(i.to_owned() + "\n"));
-
-        let messages = decode_stream(body_stream.into_async_read());
-
-        let mut result = None;
-        async_std::task::block_on(async {
-            result = Some(messages.map(|i| i.unwrap()).collect::<Vec<_>>().await);
-        });
-
-        let results = result.unwrap();
-        assert_eq!(results.len(), 2);
-        assert_eq!(results.get(0).unwrap(), &Event::id("id1"));
-        assert_eq!(results.get(1).unwrap(), &Event::message("message", "data1"));
     }
 }
