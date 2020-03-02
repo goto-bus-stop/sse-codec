@@ -1,6 +1,6 @@
 //! A [`futures_codec`](https://crates.io/crates/futures_codec) that encodes and decodes Server-Sent Event/Event Sourcing streams.
 //!
-//! It emits or serializes full messages, and the meta-messages `retry:` and `id:`.
+//! It emits or serializes full messages, and the meta-message `retry:`.
 //!
 //! # Examples
 //! ```rust,no_run
