@@ -178,6 +178,8 @@ pub struct SSECodec {
     processed_bom: bool,
     /// Was the last character of the previous line a \r?
     last_was_cr: bool,
+    /// Bytes that were fed to the decoder but do not yet form a message.
+    buffer: BytesMut,
     /// The _last event ID_ buffer.
     last_event_id: Option<String>,
     /// The _event type_ buffer.
@@ -259,8 +261,12 @@ impl Decoder for SSECodec {
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        while let Some(pos) = memchr2(b'\r', b'\n', src) {
-            let line = src.split_to(pos + 1);
+        // it's unfortunate to have to copy this stuff in, but I think the only way to discard
+        // trailing data with futures_codec is by emptying the `src` buffer on every `decode()`
+        // call.
+        self.buffer.unsplit(src.split_to(src.len()));
+        while let Some(pos) = memchr2(b'\r', b'\n', &self.buffer) {
+            let line = self.buffer.split_to(pos + 1);
 
             // treat \r\n as one newline
             if pos == 0 && line == "\n" && self.last_was_cr {
@@ -283,6 +289,10 @@ impl Decoder for SSECodec {
             }
         }
         Ok(None)
+    }
+
+    fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        unreachable!("SSECodec::decode() should have consumed all data, but {} bytes are in the buffer", src.len())
     }
 }
 
