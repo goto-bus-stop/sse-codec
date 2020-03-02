@@ -15,16 +15,18 @@
 //!     println!("incoming: {:?}", event);
 //!
 //!     match event {
-//!         Event::LastEventId { id } => {
-//!             // change the last event ID
-//!         },
 //!         Event::Retry { retry } => {
 //!             // change a retry timer value or something
 //!         }
 //!         Event::Message { event, .. } if event == "stop" => {
 //!             break;
 //!         }
-//!         _ => (),
+//!         Event::Message { id, event, data } => {
+//!             if let Some(id) = id {
+//!                 // change the last event ID
+//!             }
+//!             // handle event here
+//!         }
 //!     }
 //! }
 //! # Ok(()) }
@@ -42,17 +44,14 @@ use std::{fmt, str::FromStr};
 pub enum Event {
     /// An incoming message.
     Message {
+        /// The ID of this event.
+        ///
+        /// See also the [Server-Sent Events spec](https://html.spec.whatwg.org/multipage/server-sent-events.html#concept-event-stream-last-event-id).
+        id: Option<String>,
         /// The event type. Defaults to "message" if no event name is provided.
         event: String,
         /// The data for this event.
         data: String,
-    },
-    /// Set the _last event ID string_.
-    ///
-    /// See also the [Server-Sent Events spec](https://html.spec.whatwg.org/multipage/server-sent-events.html#concept-event-stream-last-event-id).
-    LastEventId {
-        /// The value to be set as the event source's last event ID.
-        id: String,
     },
     /// Set the _reconnection time_.
     ///
@@ -65,16 +64,12 @@ pub enum Event {
 
 impl Event {
     /// Create a server-sent event message.
-    pub fn message(event: &str, data: &str) -> Self {
+    pub fn message<'a>(event: &str, data: &str, id: impl Into<Option<&'a str>>) -> Self {
         Event::Message {
+            id: id.into().map(String::from),
             event: event.to_string(),
             data: data.to_string(),
         }
-    }
-
-    /// Create a message that sets the last event ID, without emitting an event message.
-    pub fn id(id: &str) -> Self {
-        Event::LastEventId { id: id.to_string() }
     }
 
     /// Create a message that configures the retry timeout.
@@ -154,7 +149,14 @@ impl FromStr for Event {
 impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Event::Message { event, data } => {
+            Event::Message { id, event, data } => {
+                if let Some(id) = id {
+                    if id.is_empty() {
+                        writeln!(f, "id")?;
+                    } else {
+                        writeln!(f, "id: {}", &id)?;
+                    }
+                }
                 if event != "message" {
                     writeln!(f, "event: {}", &event)?;
                 }
@@ -165,13 +167,6 @@ impl fmt::Display for Event {
                 Ok(())
             }
             Event::Retry { retry } => writeln!(f, "retry: {}", retry),
-            Event::LastEventId { id } => {
-                if id.is_empty() {
-                    writeln!(f, "id")
-                } else {
-                    writeln!(f, "id: {}", id)
-                }
-            }
         }
     }
 }
@@ -184,9 +179,9 @@ pub struct SSECodec {
     /// Was the last character of the previous line a \r?
     last_was_cr: bool,
     /// The _last event ID_ buffer.
-    id: Option<String>,
+    last_event_id: Option<String>,
     /// The _event type_ buffer.
-    event: Option<String>,
+    event_type: Option<String>,
     /// The _data_ buffer.
     data: String,
 }
@@ -197,24 +192,18 @@ impl SSECodec {
             "message".to_string()
         }
 
-        if let Some(id) = self.id.take() {
-            // Set the last event ID string of the event source to the value of the last event ID buffer.
-            //
-            // NOTE: In the spec, the last event ID state is maintained and this update happens for
-            // every message. However sse-codec does not maintain last event ID state, so instead
-            // it emits a LastEventId event whenever it is updated, always separately from the
-            // messages themselves.
-            Some(Event::LastEventId { id })
-        } else if self.data.is_empty() {
+        if self.data.is_empty() {
             // If the data buffer is an empty string, set the data buffer and the event type buffer to the empty string [and return.]
-            self.event.take();
+            self.event_type.take();
             None
         } else {
             if self.data.ends_with('\n') {
                 self.data.pop();
             }
             Some(Event::Message {
-                event: self.event.take().unwrap_or_else(default_event_name),
+                // The _last event ID_ buffer persists between messages.
+                id: self.last_event_id.clone(),
+                event: self.event_type.take().unwrap_or_else(default_event_name),
                 data: std::mem::replace(&mut self.data, String::new()),
             })
         }
@@ -235,7 +224,7 @@ impl SSECodec {
             // If the field name is "event":
             (Some("event"), Some(value)) => {
                 // Set the event type buffer to field value.
-                self.event = Some(strip_leading_space(value).to_string());
+                self.event_type = Some(strip_leading_space(value).to_string());
             }
             // If the field name is "data":
             (Some("data"), value) => {
@@ -250,7 +239,7 @@ impl SSECodec {
             (Some("id"), Some(id_str)) if !id_str.contains(char::from(0)) => {
                 // If the field value does not contain U+0000 NULL, then set the last event ID buffer to the field value.
                 // Otherwise, ignore the field.
-                self.id = Some(strip_leading_space(id_str).to_string());
+                self.last_event_id = Some(strip_leading_space(id_str).to_string());
                 return self.take_message();
             }
             // Comment
@@ -325,6 +314,7 @@ pub fn encode_stream<W: AsyncWrite>(output: W) -> EncodeStream<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::stream::{self, StreamExt, TryStreamExt};
 
     #[test]
     fn simple_event() {
@@ -340,6 +330,7 @@ mod tests {
         assert_eq!(
             event,
             Some(Event::Message {
+                id: None,
                 event: "add".to_string(),
                 data: "test\ntest2".to_string(),
             })
@@ -348,8 +339,6 @@ mod tests {
 
     #[test]
     fn decode_stream_when_fed_by_line() {
-        use futures::stream::{self, StreamExt, TryStreamExt};
-
         let input: Vec<&str> = vec![":ok", "", "event:message", "id:id1", "data:data1", ""];
 
         let body_stream = stream::iter(input).map(|i| Ok(i.to_owned() + "\n"));
@@ -362,9 +351,36 @@ mod tests {
         });
 
         let results = result.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(
+            results.get(0).unwrap(),
+            &Event::message("message", "data1", "id1")
+        );
+    }
+
+    #[test]
+    fn maintain_id_state() {
+        let input: Vec<&str> = vec!["id:1", "data:messageone", "", "data:messagetwo", ""];
+
+        let body_stream = stream::iter(input).map(|i| Ok(i.to_owned() + "\n"));
+
+        let messages = decode_stream(body_stream.into_async_read());
+
+        let mut result = None;
+        async_std::task::block_on(async {
+            result = Some(messages.map(|i| i.unwrap()).collect::<Vec<_>>().await);
+        });
+
+        let mut results = result.unwrap();
         assert_eq!(results.len(), 2);
-        assert_eq!(results.get(0).unwrap(), &Event::id("id1"));
-        assert_eq!(results.get(1).unwrap(), &Event::message("message", "data1"));
+        assert_eq!(
+            results.remove(0),
+            Event::message("message", "messageone", "1")
+        );
+        assert_eq!(
+            results.remove(0),
+            Event::message("message", "messagetwo", "1")
+        );
     }
 }
 
@@ -417,6 +433,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "msg\nmsg".into()
             })
@@ -424,6 +441,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "".into()
             })
@@ -431,6 +449,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "end".into()
             })
@@ -455,6 +474,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "1".into()
             })
@@ -462,6 +482,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "3".into()
             })
@@ -487,6 +508,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "2".into()
             })
@@ -494,6 +516,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "3".into()
             })
@@ -518,6 +541,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "1\n2\n3\n4".into()
             })
@@ -537,11 +561,12 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "test1".into()
             })
         );
-        assert!(messages.next().is_none());
+        assert!(dbg!(messages.next()).is_none());
     }
 
     /// https://github.com/web-platform-tests/wpt/blob/master/eventsource/format-field-data.htm
@@ -552,6 +577,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "".into()
             })
@@ -559,6 +585,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "\n".into()
             })
@@ -566,6 +593,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "test".into()
             })
@@ -581,6 +609,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "".into(),
                 data: "data".into()
             })
@@ -596,6 +625,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "test".into(),
                 data: "x".into()
             })
@@ -603,6 +633,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "x".into()
             })
@@ -632,6 +663,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "\0\n 2\n1\n3\n\n4".into()
             })
@@ -651,6 +683,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "x".into()
             })
@@ -666,6 +699,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "test".into()
             })
@@ -685,6 +719,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "x".into()
             })
@@ -701,6 +736,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "test\n\ntest".into()
             })
@@ -716,6 +752,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "\ttest\n\ntest".into()
             })
@@ -731,6 +768,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "test\n\ntest".into()
             })
@@ -746,6 +784,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "\0".into()
             })
@@ -761,6 +800,7 @@ mod wpt {
         assert_eq!(
             messages.next().map(Result::unwrap),
             Some(Event::Message {
+                id: None,
                 event: "message".into(),
                 data: "ok…".into()
             })

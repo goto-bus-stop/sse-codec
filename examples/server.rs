@@ -6,11 +6,12 @@ async fn amain() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let output = async_std::io::stdout();
     let mut stream = encode_stream(output);
 
-    stream.send(Event::message("message", "test")).await?;
+    stream.send(Event::message("message", "test", None)).await?;
     stream
         .send(Event::message(
             "something-else",
             "some-data\non\nmultiple-lines",
+            None,
         ))
         .await?;
 
