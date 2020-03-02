@@ -292,7 +292,10 @@ impl Decoder for SSECodec {
     }
 
     fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        unreachable!("SSECodec::decode() should have consumed all data, but {} bytes are in the buffer", src.len())
+        unreachable!(
+            "SSECodec::decode() should have consumed all data, but {} bytes are in the buffer",
+            src.len()
+        )
     }
 }
 
