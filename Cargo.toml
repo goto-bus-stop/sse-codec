@@ -10,7 +10,7 @@ repository = "https://github.com/goto-bus-stop/sse-codec"
 readme = "README.md"
 
 [dependencies]
-futures_codec = "= 0.3.4"
+futures_codec = "= 0.4.0"
 futures-io = "0.3"
 bytes = "0.5"
 memchr = "2.2"
