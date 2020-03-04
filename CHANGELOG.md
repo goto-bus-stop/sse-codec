@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.3.1
+* Fix `id:` lines triggering incomplete `Event::Message` event.
+  A stream like this:
+  ```
+  data:start
+  id:1243
+  data:end
+  ```
+  previously emitted two messages, with data `start` and `end` respectively, but should emit one with data `start\nend`.
+
 ## 0.3.0
 * Make `id` part of the `Event::Message` event, removing the separate non-spec `Event::LastEventId` message.
 * Ignore trailing data in the input stream.
