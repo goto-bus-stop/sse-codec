@@ -242,7 +242,6 @@ impl SSECodec {
                 // If the field value does not contain U+0000 NULL, then set the last event ID buffer to the field value.
                 // Otherwise, ignore the field.
                 self.last_event_id = Some(strip_leading_space(id_str).to_string());
-                return self.take_message();
             }
             // Comment
             (Some(""), Some(_)) => (),
@@ -389,6 +388,40 @@ mod tests {
         assert_eq!(
             results.remove(0),
             Event::message("message", "messageone", "1")
+        );
+        assert_eq!(
+            results.remove(0),
+            Event::message("message", "messagetwo", "1")
+        );
+    }
+
+    /// Regression test: `id:` lines had historically immediately emitted an event message in
+    /// sse-codec, but shouldn't.
+    #[test]
+    fn id_is_part_of_message() {
+        let input: Vec<&str> = vec![
+            "data:messageone",
+            "id:1",
+            "data:moremessageone",
+            "",
+            "data:messagetwo",
+            "",
+        ];
+
+        let body_stream = stream::iter(input).map(|i| Ok(i.to_owned() + "\n"));
+
+        let messages = decode_stream(body_stream.into_async_read());
+
+        let mut result = None;
+        async_std::task::block_on(async {
+            result = Some(messages.map(|i| i.unwrap()).collect::<Vec<_>>().await);
+        });
+
+        let mut results = result.unwrap();
+        assert_eq!(results.len(), 2);
+        assert_eq!(
+            results.remove(0),
+            Event::message("message", "messageone\nmoremessageone", "1")
         );
         assert_eq!(
             results.remove(0),
