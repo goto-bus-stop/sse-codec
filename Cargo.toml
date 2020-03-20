@@ -17,5 +17,5 @@ memchr = "2.2"
 
 [dev-dependencies]
 surf = { git = "https://github.com/http-rs/surf", default-features = false, features = ["native-client"] }
-async-std = "1.0"
+async-std = { version = "1.5", features = ["attributes"] }
 futures = "0.3"

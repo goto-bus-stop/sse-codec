@@ -324,7 +324,93 @@ pub fn encode_stream<W: AsyncWrite>(output: W) -> EncodeStream<W> {
 }
 
 #[cfg(test)]
-mod tests {
+mod encode_tests {
+    use super::*;
+    use futures::SinkExt;
+
+    #[async_std::test]
+    async fn simple_event() {
+        let mut output = vec![];
+        let mut stream = encode_stream(&mut output);
+        stream
+            .send(Event::Message {
+                id: None,
+                event: "add".to_string(),
+                data: "test\ntest2".to_string(),
+            })
+            .await
+            .unwrap();
+        assert_eq!(output, b"event: add\ndata: test\ndata: test2\n\n".to_vec());
+    }
+
+    #[async_std::test]
+    async fn with_id() {
+        let mut output = vec![];
+        let mut stream = encode_stream(&mut output);
+        stream
+            .send(Event::Message {
+                id: Some("whatever".to_string()),
+                event: "add".to_string(),
+                data: "test".to_string(),
+            })
+            .await
+            .unwrap();
+        assert_eq!(output, b"id: whatever\nevent: add\ndata: test\n\n".to_vec());
+    }
+
+    #[async_std::test]
+    async fn default_event() {
+        let mut output = vec![];
+        let mut stream = encode_stream(&mut output);
+        stream
+            .send(Event::Message {
+                id: None,
+                event: "message".to_string(),
+                data: "test".to_string(),
+            })
+            .await
+            .unwrap();
+        assert_eq!(output, b"data: test\n\n".to_vec());
+    }
+
+    #[async_std::test]
+    async fn multiple_events() {
+        let mut output = vec![];
+        let mut stream = encode_stream(&mut output);
+        stream
+            .send(Event::Message {
+                id: None,
+                event: "add".to_string(),
+                data: "test\ntest2".to_string(),
+            })
+            .await
+            .unwrap();
+        stream
+            .send(Event::Message {
+                id: Some("whatever".to_string()),
+                event: "add".to_string(),
+                data: "test".to_string(),
+            })
+            .await
+            .unwrap();
+        stream
+            .send(Event::Message {
+                id: None,
+                event: "message".to_string(),
+                data: "test".to_string(),
+            })
+            .await
+            .unwrap();
+        let mut expected = vec![];
+        expected.extend(b"event: add\ndata: test\ndata: test2\n\n".iter());
+        expected.extend(b"id: whatever\nevent: add\ndata: test\n\n".iter());
+        expected.extend(b"data: test\n\n".iter());
+        assert_eq!(output, expected);
+    }
+}
+
+#[cfg(test)]
+mod decode_tests {
     use super::*;
     use futures::stream::{self, StreamExt, TryStreamExt};
 
