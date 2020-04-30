@@ -16,6 +16,6 @@ bytes = "0.5"
 memchr = "2.2"
 
 [dev-dependencies]
-surf = { version = "= 2.0.0-alpha.1", default-features = false, features = ["native-client"] }
+surf = { version = "= 2.0.0-alpha.2", default-features = false, features = ["native-client"] }
 async-std = { version = "1.5", features = ["attributes"] }
 futures = "0.3"
