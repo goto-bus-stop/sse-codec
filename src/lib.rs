@@ -41,6 +41,7 @@ use std::{fmt, str::FromStr};
 /// An "event", either an incoming message or some meta-action that needs to be applied to the
 /// stream.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Event {
     /// An incoming message.
     Message {
