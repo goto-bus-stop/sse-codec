@@ -1,6 +1,6 @@
 [package]
 name = "sse-codec"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Renée Kooi <renee@kooi.me>"]
 description = "async Server-Sent Events protocol encoder/decoder"
 edition = "2018"
@@ -10,12 +10,13 @@ repository = "https://github.com/goto-bus-stop/sse-codec"
 readme = "README.md"
 
 [dependencies]
-futures_codec = "= 0.4.0"
+futures_codec = "= 0.4.1"
 futures-io = "0.3"
 bytes = "0.5"
 memchr = "2.2"
+arbitrary = { version = "0.4.5", features = ["derive"], optional = true }
 
 [dev-dependencies]
-surf = { version = "= 2.0.0-alpha.1", default-features = false, features = ["native-client"] }
+surf = { version = "= 2.0.0-alpha.4", default-features = false, features = ["native-client"] }
 async-std = { version = "1.5", features = ["attributes"] }
 futures = "0.3"
