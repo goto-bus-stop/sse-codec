@@ -31,8 +31,7 @@
 //! }
 //! # Ok(()) }
 //! ```
-use bytes::BytesMut;
-use futures_codec::{Decoder, Encoder, FramedRead, FramedWrite};
+use futures_codec::{BytesMut, Decoder, Encoder, FramedRead, FramedWrite};
 use futures_io::{AsyncRead, AsyncWrite};
 use memchr::memchr2;
 use std::fmt::Write as _;
