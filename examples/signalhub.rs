@@ -7,8 +7,12 @@ use sse_codec::{decode_stream, Event};
 use std::time::Duration;
 
 /// Listen for messages from the server-sent event source.
-async fn listen() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let response = surf::get("https://signalhub-jccqtwhdwc.now.sh/v1/sse-codec/example").await?;
+async fn listen(client: &surf::Client) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let response = client
+        .send(surf::get(
+            "https://signalhub-jccqtwhdwc.now.sh/v1/sse-codec/example",
+        ))
+        .await?;
     let mut events = decode_stream(response);
 
     while let Some(line) = events.try_next().await? {
@@ -25,15 +29,21 @@ async fn listen() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 
 /// Send a message to the server for broadcast.
-async fn publish() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn publish(client: &surf::Client) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     async_std::task::sleep(Duration::from_secs(1)).await;
 
-    surf::post("https://signalhub-jccqtwhdwc.now.sh/v1/sse-codec/example")
-        .body_bytes(br#"{"event": "sample"}"#)
+    client
+        .send(
+            surf::post("https://signalhub-jccqtwhdwc.now.sh/v1/sse-codec/example")
+                .body(&br#"{"event": "sample"}"#[..]),
+        )
         .await?;
 
-    surf::post("https://signalhub-jccqtwhdwc.now.sh/v1/sse-codec/example")
-        .body_bytes(b"stop")
+    client
+        .send(
+            surf::post("https://signalhub-jccqtwhdwc.now.sh/v1/sse-codec/example")
+                .body(&b"stop"[..]),
+        )
         .await?;
 
     Ok(())
@@ -41,7 +51,9 @@ async fn publish() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 /// "async main"
 async fn amain() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let (a, b) = future::join(listen(), publish()).await;
+    let client = surf::client();
+
+    let (a, b) = future::join(listen(&client), publish(&client)).await;
     // check the results…
     let _ = a?;
     let _ = b?;
