@@ -16,6 +16,6 @@ memchr = "2.2"
 arbitrary = { version = "1.0.0", features = ["derive"], optional = true }
 
 [dev-dependencies]
-surf = { version = "= 2.0.0-alpha.5", default-features = false, features = ["native-client"] }
+surf = { version = "2.0", default-features = false, features = ["curl-client"] }
 async-std = { version = "1.5", features = ["attributes"] }
 futures = "0.3"
