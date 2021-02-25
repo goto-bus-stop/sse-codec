@@ -124,11 +124,7 @@ impl From<std::str::Utf8Error> for Error {
 
 /// Chop off a leading space (code point 0x20) from a string slice.
 fn strip_leading_space(input: &str) -> &str {
-    if input.starts_with(' ') {
-        &input[1..]
-    } else {
-        input
-    }
+    input.strip_prefix(' ').unwrap_or(input)
 }
 
 impl FromStr for Event {
@@ -271,7 +267,7 @@ impl Decoder for SSECodec {
             // get rid of the '\n' at the end
             let line = std::str::from_utf8(&line[..pos])?;
             // get rid of the BOM at the start
-            let line = if line.starts_with("\u{feff}") && !self.processed_bom {
+            let line = if line.starts_with('\u{feff}') && !self.processed_bom {
                 self.processed_bom = true;
                 &line[3..]
             } else {
