@@ -55,8 +55,8 @@ async fn amain() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let (a, b) = future::join(listen(&client), publish(&client)).await;
     // check the results…
-    let _ = a?;
-    let _ = b?;
+    a?;
+    b?;
     Ok(())
 }
 

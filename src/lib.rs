@@ -200,7 +200,7 @@ impl SSECodec {
                 // The _last event ID_ buffer persists between messages.
                 id: self.last_event_id.clone(),
                 event: self.event_type.take().unwrap_or_else(default_event_name),
-                data: std::mem::replace(&mut self.data, String::new()),
+                data: std::mem::take(&mut self.data),
             })
         }
     }
@@ -254,7 +254,7 @@ impl Decoder for SSECodec {
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        while let Some(pos) = memchr2(b'\r', b'\n', &src) {
+        while let Some(pos) = memchr2(b'\r', b'\n', src) {
             let line = src.split_to(pos + 1);
 
             // treat \r\n as one newline
@@ -650,12 +650,12 @@ mod wpt {
         let longstring = "x".repeat(2049);
         let mut input = concat!("data:1\r", ":\0\n", ":\r\n", "data:2\n", ":").to_string();
         input.push_str(&longstring);
-        input.push_str("\r");
+        input.push('\r');
         input.push_str("data:3\n");
         input.push_str(":data:fail\r");
-        input.push_str(":");
+        input.push(':');
         input.push_str(&longstring);
-        input.push_str("\n");
+        input.push('\n');
         input.push_str("data:4\n\n");
         let mut messages = decode(input.as_bytes());
         assert_eq!(
