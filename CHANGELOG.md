@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.3.3
+* Use `futures_codec` 0.5.0, which has a smaller dependency tree and resolves [RUSTSEC-2026-0007](https://rustsec.org/advisories/RUSTSEC-2026-0007). (@BatmanAoD, #16)
+* Remove a now-unnecessary copy of all incoming bytes. (#6)
+
 ## 0.3.2
 * Add encoding tests.
 * Add fuzz test.
